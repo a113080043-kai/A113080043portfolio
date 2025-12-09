@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" style="scroll-behavior: smooth;">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>個人繪圖作品集 | 創作者</title>
+    <!-- 載入 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 載入 Three.js 函式庫 for 3D Modeling Section -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        /* 使用 Inter 字體作為主要的 Sans-serif 字體 */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        
+        /* 自定義 Tailwind 配置 */
+        :root {
+            --color-accent: #FFD700; /* 亮黃色作為主要點綴色 */
+            --color-secondary-accent: #FF4500; /* 亮紅色 */
+        }
+
+        /* 確保所有元素使用簡潔字體 */
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: #1a1a1a; /* 深灰黑背景 */
+            color: #f0f0f0; /* 淺灰白文字 */
+        }
+        
+        /* 極簡導航樣式 */
+        .nav-link:hover {
+            color: var(--color-accent);
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        /* 圖片卡片 hover 效果 */
+        .gallery-card {
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+            /* 將卡片邊框從 #333 移除，只保留陰影和 hover 效果 */
+            border: 1px solid transparent; 
+        }
+
+        .gallery-card:hover {
+            transform: scale(1.03); /* 輕微放大，比之前的小一點 */
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.2); /* 點綴色陰影 */
+        }
+        
+        /* 3D 建模區塊的 Canvas 樣式 (針對 Three.js 容器) */
+        #modeling-container {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background-color: #000;
+        }
+        
+        /* 3D 輪播容器樣式 */
+        #modeling-display {
+            width: 100%;
+            aspect-ratio: 16 / 9; /* 保持長寬比 */
+            min-height: 300px;
+            max-height: 80vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        /* 隱藏 Three.js 產生的 canvas 邊界 */
+        #modeling-container canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 按讚按鈕動畫效果 */
+        #like-button.liked {
+            animation: pulse 0.5s 1;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* 場景圖輪播特有樣式 */
+        #scenes-display {
+            /* 設置高度和允許垂直滾動 */
+            height: 90vh; /* 限制高度在 90% 視口高度 */
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory; /* 強制滾動對齊 */
+            -webkit-overflow-scrolling: touch; /* 提升 iOS 上的滾動體驗 */
+            padding: 1rem 0;
+            /* 移除外部邊框 */
+        }
+        
+        #scenes-display .scene-group {
+            /* 讓每個組的高度佔滿容器，方便滾動對齊，但實際圖片大小由內容決定 */
+            /* 這裡設定一個合理的最小高度，讓它至少能包含單張圖並置中 */
+            min-height: 90vh; 
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* 垂直置中 */
+            align-items: center;
+            gap: 2rem; /* 組內兩張圖之間的間距 (現在一組只有一張，但保持樣式) */
+            scroll-snap-align: center; /* 滾動到中心位置對齊 */
+        }
+
+        #scenes-display .gallery-card {
+            width: 90%; /* 確保圖片不頂邊 */
+            max-width: 1000px;
+            /* 將卡片的邊框調整為柔和的深色，維持視覺上的區隔 */
+            border: 4px solid #333333; 
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            transition: all 0.5s ease;
+        }
+
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- 頂部固定導航 -->
+    <header class="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-sm shadow-lg">
+        <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <a href="#hero" class="text-xl font-bold tracking-widest text-white hover:text-gray-400 transition duration-300">
+                PORTFOLIO<span class="text-yellow-400">.</span>
+            </a>
+            <div class="flex space-x-6">
+                <!-- 導航更新：移除獨立的影片和建模連結，統一到作品集 -->
+                <a href="#about" class="nav-link text-sm uppercase tracking-wider text-gray-300 transition duration-300">關於我</a>
+                <a href="#portfolio" class="nav-link text-sm uppercase tracking-wider text-gray-300 transition duration-300">作品集</a>
+                <a href="#contact" class="nav-link text-sm uppercase tracking-wider text-gray-300 transition duration-300">聯絡</a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- 1. 大展示圖 (Hero Section) -->
+    <section id="hero" class="relative min-h-screen flex items-center justify-center pt-16 bg-cover bg-center transition-all duration-1000" style="background-image: url('https://placehold.co/1920x1080/222/FFF?text=REPRESENTATIVE+WORK+1');" data-current-index="0">
+        <!-- 遮罩層，增加文字可讀性 -->
+        <div class="absolute inset-0 bg-black/60"></div>
+        
+        <div class="z-10 text-center p-8">
+            <h1 class="text-7xl md:text-9xl font-extrabold tracking-tighter text-white drop-shadow-lg">
+                <span class="text-yellow-400">CHARACTER</span>.
+            </h1>
+            <p class="mt-4 text-2xl md:text-3xl text-gray-200 font-light italic">
+                「在虛構世界中尋找無限可能。」
+            </p>
+
+            <!-- 按讚功能區塊 -->
+            <div class="mt-12 flex flex-col items-center space-y-3">
+                <button id="like-button" class="flex items-center space-x-2 bg-yellow-400 text-gray-900 font-bold py-3 px-6 rounded-full shadow-xl hover:bg-yellow-300 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <!-- Icon for Heart -->
+                    <svg id="like-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 fill-current text-gray-900"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                    <span id="like-text">給個讚！</span>
+                </button>
+                <p id="like-count-display" class="text-sm text-gray-400">目前總讚數：0</p>
+                <p id="like-status-message" class="text-sm text-red-400"></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 2. 個人介紹 (About Me) -->
+    <section id="about" class="py-20 md:py-32 bg-gray-900">
+        <div class="container mx-auto px-6 lg:px-20 max-w-4xl">
+            <h2 class="text-5xl font-extrabold mb-12 border-b-4 border-yellow-400 pb-2 inline-block">關於我 / ABOUT ME</h2>
+            <div class="flex flex-col md:flex-row items-start md:space-x-12">
+                
+                <!-- 個人頭像 -->
+                <div class="w-full md:w-1/3 mb-8 md:mb-0 flex justify-center">
+                    <img src="https://placehold.co/200x200/555/FFF?text=AVATAR" alt="" class="rounded-full w-48 h-48 object-cover border-4 border-yellow-400 shadow-2xl transition duration-500 hover:rotate-3">
+                </div>
+                
+                <!-- 簡短文字介紹 -->
+                <div class="w-full md:w-2/3">
+                    <h3 class="text-3xl font-semibold mb-4 text-white">創作者 / 角色設計師</h3>
+                    <p class="text-lg leading-relaxed text-gray-300 mb-6">
+                        嗨！我是Firguan，一位專注於二次元風格的數媒系學生與插畫愛好者。我的作品風格主要探索光影與情感的細膩結合，尤其熱衷於為每個角色賦予獨特的靈魂和故事。
+                    </p>
+                    <p class="text-lg leading-relaxed text-gray-300 mb-8">
+                        這裡展示的每一張圖，都是對世界的一種詮釋。希望我的作品能為您帶來一些靈感與快樂。
+                    </p>
+
+                    <!-- 聯絡資訊區塊，使用點綴色強調 -->
+                    <div class="space-y-3 p-4 border-l-4 border-red-500 bg-gray-800/50">
+                        <p class="text-base font-medium text-white">
+                            instagram: <a href="https://www.instagram.com/firguan_39/" class="text-yellow-400 hover:underline">firguan_39</a>
+                        </p>
+                        <p class="text-base font-medium text-white">
+                            社群: <a href="#" class="text-blue-500 hover:underline">@YourSocialHandle</a> (Pixiv / Twitter)
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. 主要作品集區塊 (PORTFOLIO) - 包含所有子分類並按新順序排列 -->
+    <section id="portfolio" class="py-20 md:py-32 bg-gray-800">
+        <div class="container mx-auto px-6 lg:px-20">
+            <h2 class="text-5xl font-extrabold mb-16 border-b-4 border-yellow-400 pb-2 inline-block">作品集 / PORTFOLIO</h2>
+
+            <!-- 3.1 影片展示區 (Video Showcase) -->
+            <div id="portfolio-videos" class="pt-8 pb-24 border-b border-gray-700">
+                <h3 class="text-4xl font-bold mb-8 text-white">影片展示 / VIDEO SHOWCASE</h3>
+                <p class="text-xl text-gray-300 mb-8">
+                    這裡展示了我的動畫、流程紀錄或短片作品。
+                </p>
+
+                <!-- Video 播放器容器 -->
+                <div id="video-player-container" class="relative w-full aspect-video rounded-xl overflow-hidden shadow-2xl border-4 border-yellow-400 bg-black">
+                    <!-- Video iframe will be injected here -->
+                </div>
+
+                <!-- 影片切換控制 -->
+                <div class="mt-8 flex justify-center space-x-6">
+                    <button id="prev-video" class="bg-gray-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-yellow-400 hover:text-gray-900 transition duration-300">
+                        &larr; 上一個
+                    </button>
+                    <span id="video-counter" class="text-lg flex items-center text-gray-400">1 / 3</span>
+                    <button id="next-video" class="bg-gray-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-yellow-400 hover:text-gray-900 transition duration-300">
+                        下一個 &rarr;
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 3.2 3D 建模展示區 (3D Modeling Showcase) -->
+            <div id="portfolio-modeling" class="pt-12 pb-24 border-b border-gray-700">
+                <h3 class="text-4xl font-bold mb-8 text-white">3D 建模 / 3D MODELING</h3>
+                <p id="modeling-title" class="text-xl text-gray-300 mb-8">
+                    模型 1/3: 旋轉的藍色方塊 (Three.js 示範)。您可以拖曳滑鼠來改變視角。
+                </p>
+                <!-- Three.js Canvas 容器 / Placeholder -->
+                <div id="modeling-carousel-container" class="relative rounded-xl overflow-hidden shadow-2xl border-4 border-blue-500">
+                    <div id="modeling-display" class="w-full aspect-video min-h-[300px] max-h-[80vh] bg-black">
+                         <!-- 初始 Three.js Canvas 將被注入到 #modeling-container 中 -->
+                         <div id="modeling-container" class="w-full h-full"></div>
+                    </div>
+                     <!-- Navigation -->
+                    <button class="absolute top-1/2 left-0 -translate-y-1/2 p-3 mx-2 bg-black/50 hover:bg-black/80 rounded-full text-white z-10" id="modeling-prev">&larr;</button>
+                    <button class="absolute top-1/2 right-0 -translate-y-1/2 p-3 mx-2 bg-black/50 hover:bg-black/80 rounded-full text-white z-10" id="modeling-next">&rarr;</button>
+                </div>
+            </div>
+
+            <!-- 3.3 人物半身圖 (Character Busts) - 輪播 -->
+            <div id="portfolio-busts" class="pt-12 pb-24 border-b border-gray-700">
+                <h3 class="text-4xl font-bold mb-8 text-white">人物半身圖 / Character Busts</h3>
+                <div id="busts-carousel" class="relative flex flex-col items-center justify-center">
+                    <!-- Carousel Content: 調整為 md:grid-cols-3 -->
+                    <div id="busts-display" class="w-full grid grid-cols-1 md:grid-cols-3 gap-6 transition-all duration-500">
+                        <!-- Images will be inserted here by JS -->
+                    </div>
+                    <!-- Navigation and Counter -->
+                    <div class="mt-8 flex justify-center space-x-6 w-full">
+                        <button class="bg-gray-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-500 transition duration-300" id="busts-prev">&larr; 上一組</button>
+                        <span id="busts-counter" class="text-lg flex items-center text-gray-400"></span>
+                        <button class="bg-gray-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-500 transition duration-300" id="busts-next">下一組 &rarr;</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3.4 人物立繪 (Full-body Characters) - 輪播 -->
+            <div id="portfolio-full-body" class="pt-12 pb-24 border-b border-gray-700">
+                <h3 class="text-4xl font-bold mb-8 text-white">人物立繪 / Full-body Designs</h3>
+                <div id="full-body-carousel" class="relative flex items-center justify-center">
+                    <!-- Carousel Content -->
+                    <div id="full-body-display" class="w-full lg:w-1/3 rounded-lg overflow-hidden transition-all duration-500">
+                        <!-- Image will be inserted here by JS -->
+                    </div>
+                    <!-- Navigation -->
+                    <button class="absolute left-0 p-3 mx-2 bg-black/50 hover:bg-black/80 rounded-full text-white z-10" id="full-body-prev">&larr;</button>
+                    <button class="absolute right-0 p-3 mx-2 bg-black/50 hover:bg-black/80 rounded-full text-white z-10" id="full-body-next">&rarr;</button>
+                </div>
+            </div>
+            
+            <!-- 3.5 16:9 插圖 (16:9 Illustrations) - 輪播 -->
+            <div id="portfolio-illustrations" class="pt-12 pb-24 border-b border-gray-700">
+                <h3 class="text-4xl font-bold mb-8 text-white">插圖 / Illustrations</h3>
+                <div id="illustrations-carousel" class="relative flex items-center justify-center">
+                    <!-- Carousel Content -->
+                    <!-- 使用 lg:w-3/4 讓圖片比立繪區塊稍微寬一些，符合橫向比例的視覺效果 -->
+                    <div id="illustrations-display" class="w-full lg:w-3/4 rounded-lg overflow-hidden transition-all duration-500 border-4 border-red-500">
+                        <!-- Image will be inserted here by JS -->
+                    </div>
+                    <!-- Navigation -->
+                    <button class="absolute left-0 p-3 mx-2 bg-black/50 hover:bg-black/80 rounded-full text-white z-10" id="illustrations-prev">&larr;</button>
+                    <button class="absolute right-0 p-3 mx-2 bg-black/50 hover:bg-black/80 rounded-full text-white z-10" id="illustrations-next">&rarr;</button>
+                </div>
+            </div>
+
+            <!-- 3.6 場景圖 (Scene Illustrations) - 滾輪式上下切換 (Scroll-Snap) -->
+            <div id="portfolio-scenes" class="pt-12 pb-8">
+                <h3 class="text-4xl font-bold mb-8 text-white">場景圖 / Scene Illustrations</h3>
+                <p class="text-xl text-gray-400 mb-4">
+                    <!-- 提示文字更新為一次顯示一張 -->
+                    請滾動下方區域來瀏覽場景圖。
+                </p>
+                <!-- 滾動容器: 移除綠色邊框的 Tailwind Class -->
+                <div id="scenes-display" class="w-full rounded-xl bg-gray-900/50">
+                    <!-- 圖片群組將由 JS 注入 -->
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+
+    <!-- 4. Footer & 聯絡 (Contact) -->
+    <footer id="contact" class="bg-black py-16">
+        <div class="container mx-auto px-6 lg:px-20 text-center">
+            <h2 class="text-4xl font-extrabold mb-4 text-white">聯絡我 / GET IN TOUCH</h2>
+            <p class="text-xl text-gray-400 mb-8">
+                若有合作機會或單純想交流，歡迎隨時聯繫我。
+            </p>
+
+            <!-- 聯絡方式與社群連結 -->
+            <div class="flex justify-center space-x-6 mb-8">
+                <a href="mailto:your.email@example.com" class="text-2xl text-yellow-400 hover:text-white transition duration-300">
+                    <!-- Icon for Email -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                </a>
+                <a href="#" target="_blank" class="text-2xl text-red-500 hover:text-white transition duration-300">
+                    <!-- Icon for Art/Social Platform -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+                </a>
+                <a href="#" target="_blank" class="text-2xl text-blue-500 hover:text-white transition duration-300">
+                    <!-- Icon for Social Platform 2 -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6.3-2.1l-.8.1-.8.1c-2.4 1-5.1 1.2-7.5.3 4.2 4.1 10.7 6 16.2 3.9-.1-1.3-.9-2.5-2.1-3.4 1.7-.2 3.2-.8 4.6-1.7-1.2 1.9-2.7 3.6-4.3 5.1 1.3-.1 2.6-.4 3.9-.9z"/></svg>
+                </a>
+            </div>
+
+            <!-- 版權資訊 -->
+            <p class="mt-8 text-sm text-gray-600 border-t border-gray-700 pt-4">
+                &copy; 2024 Firguan All Rights Reserved. | Designed with Minimalist Aesthetic
+            </p>
+        </div>
+    </footer>
+
+    <script type="module">
+        // -----------------------------------------------------------------
+        // Firebase 導入與初始化 (用於按讚功能)
+        // -----------------------------------------------------------------
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, runTransaction, increment, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // setLogLevel('Debug'); // uncomment for debugging
+
+        // 全域變數
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app, db, auth, userId = null;
+        let isAuthReady = false;
+        let threeJsRenderer = null; // 儲存 Three.js 渲染器實例
+
+        const LIKE_DOC_PATH = 'likes_count'; // Document ID for public like counter
+
+        const getPublicDocRef = (docId) => {
+            return doc(db, 'artifacts', appId, 'public', 'data', 'general_metrics', docId);
+        };
+
+        const getPrivateUserDocRef = (docId) => {
+             // For private data, we use the userId
+            return doc(db, 'artifacts', appId, 'users', userId, 'user_preferences', docId);
+        };
+
+
+        async function initFirebaseAndAuth() {
+            try {
+                if (Object.keys(firebaseConfig).length === 0) {
+                    console.error("Firebase configuration is missing.");
+                    return;
+                }
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // 認證流程：優先使用 custom token，否則匿名登入
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                // 監聽登入狀態
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        isAuthReady = true;
+                        console.log('Firebase Auth Ready. User ID:', userId);
+                        setupLikeListener();
+                        checkUserLiked();
+                    } else {
+                        isAuthReady = true;
+                        console.log('User signed out or authentication failed.');
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase initialization or authentication failed:", error);
+            }
+        }
+
+
+        // -----------------------------------------------------------------
+        // 1. 按讚功能邏輯 (Firestore)
+        // -----------------------------------------------------------------
+
+        const likeButton = document.getElementById('like-button');
+        const likeCountDisplay = document.getElementById('like-count-display');
+        const likeStatusMessage = document.getElementById('like-status-message');
+        const userLikedStorageKey = 'portfolio_liked_' + appId;
+        let hasUserLiked = localStorage.getItem(userLikedStorageKey) === 'true';
+
+        // 設置初始按鈕狀態
+        if (hasUserLiked) {
+            likeButton.disabled = true;
+            likeButton.classList.add('liked');
+            document.getElementById('like-text').textContent = '已按讚！';
+        }
+
+        /**
+         * 檢查用戶是否已經按讚（透過本地儲存和用戶偏好文檔）
+         */
+        function checkUserLiked() {
+            if (!isAuthReady) return;
+
+            // 優先檢查 localStorage
+            if (hasUserLiked) return; 
+            
+            // 檢查 Firestore (更可靠)
+            const userPrefRef = getPrivateUserDocRef('likes');
+            onSnapshot(userPrefRef, (docSnap) => {
+                if (docSnap.exists() && docSnap.data().hasLiked === true) {
+                    hasUserLiked = true;
+                    localStorage.setItem(userLikedStorageKey, 'true');
+                    likeButton.disabled = true;
+                    likeButton.classList.add('liked');
+                    document.getElementById('like-text').textContent = '已按讚！';
+                    likeStatusMessage.textContent = '感謝您的支持！';
+                }
+            }, (error) => {
+                console.error("Error checking user like status:", error);
+            });
+        }
+
+
+        /**
+         * 監聽總讚數的變化並更新 UI
+         */
+        function setupLikeListener() {
+            if (!db || !isAuthReady) return;
+            const likeRef = getPublicDocRef(LIKE_DOC_PATH);
+
+            onSnapshot(likeRef, (doc) => {
+                if (doc.exists()) {
+                    const count = doc.data().count || 0;
+                    likeCountDisplay.textContent = `目前總讚數：${count.toLocaleString()}`;
+                } else {
+                    likeCountDisplay.textContent = '目前總讚數：0';
+                    // 如果文件不存在，確保它被創建
+                    setDoc(likeRef, { count: 0 }, { merge: true }).catch(err => console.error("Error creating like document:", err));
+                }
+            }, (error) => {
+                console.error("Error listening to like count:", error);
+                likeCountDisplay.textContent = '無法載入讚數。';
+            });
+        }
+
+        /**
+         * 執行按讚操作
+         */
+        async function handleLike() {
+            if (!isAuthReady || hasUserLiked) {
+                likeStatusMessage.textContent = '您已經按過讚了。';
+                return;
+            }
+
+            likeButton.disabled = true;
+            likeButton.classList.remove('liked'); // Remove before transaction attempt
+            likeStatusMessage.textContent = '正在處理您的讚...';
+
+            const likeRef = getPublicDocRef(LIKE_DOC_PATH);
+            const userPrefRef = getPrivateUserDocRef('likes');
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    // 1. 公開計數器 +1
+                    const likeDoc = await transaction.get(likeRef);
+                    if (!likeDoc.exists()) {
+                        transaction.set(likeRef, { count: 1 });
+                    } else {
+                        transaction.update(likeRef, { count: increment(1) });
+                    }
+                    
+                    // 2. 記錄用戶已按讚的私有偏好
+                    transaction.set(userPrefRef, { hasLiked: true }, { merge: true });
+                });
+
+                // 成功後更新 UI 狀態
+                hasUserLiked = true;
+                localStorage.setItem(userLikedStorageKey, 'true');
+                likeButton.classList.add('liked');
+                document.getElementById('like-text').textContent = '已按讚！';
+                likeStatusMessage.textContent = '感謝您的支持！';
+
+            } catch (error) {
+                console.error("Like transaction failed:", error);
+                likeStatusMessage.textContent = '按讚失敗，請稍後再試。';
+                likeButton.disabled = false; // Re-enable button on failure
+            }
+        }
+
+        // 綁定事件
+        likeButton.addEventListener('click', handleLike);
+
+
+        // -----------------------------------------------------------------
+        // 2. Hero 輪播邏輯
+        // -----------------------------------------------------------------
+
+        const heroSection = document.getElementById('hero');
+        const heroContents = [
+            "https://placehold.co/1920x1080/222/FFF?text=REPRESENTATIVE+WORK+1",
+            "https://placehold.co/1920x1080/444/FFF?text=REPRESENTATIVE+WORK+2",
+            "https://placehold.co/1920x1080/666/FFF?text=REPRESENTATIVE+WORK+3"
+        ];
+        const rotationInterval = 6000; // 6 seconds
+
+        function rotateHeroContent() {
+            let currentIndex = parseInt(heroSection.getAttribute('data-current-index'));
+            currentIndex = (currentIndex + 1) % heroContents.length;
+            
+            heroSection.style.backgroundImage = `url('${heroContents[currentIndex]}')`;
+            heroSection.setAttribute('data-current-index', currentIndex);
+        }
+        
+        // -----------------------------------------------------------------
+        // 3. 影片輪播邏輯
+        // -----------------------------------------------------------------
+
+        const videoPlayerContainer = document.getElementById('video-player-container');
+        const prevVideoButton = document.getElementById('prev-video');
+        const nextVideoButton = document.getElementById('next-video');
+        const videoCounter = document.getElementById('video-counter');
+
+        const videoContents = [
+            { id: "VIDEO_ID_1", title: "作品動畫短片 A", url: "https://drive.google.com/file/d/1wSJT6eep_uMML8S9jZJHQ8UwMMW_00A3/view?usp=sharing" }, 
+            { id: "VIDEO_ID_2", title: "繪圖過程記錄 B", url: "https://www.youtube.com/embed/tgbNymZ7vqY?autoplay=0&controls=1&rel=0" }, 
+            { id: "VIDEO_ID_3", title: "概念設計展示 C", url: "https://www.youtube.com/embed/oHg5SJYRHA0?autoplay=0&controls=1&rel=0" }  
+        ];
+        let currentVideoIndex = 0;
+
+        function updateVideoPlayer() {
+            if (!videoPlayerContainer || videoContents.length === 0) return;
+            
+            const video = videoContents[currentVideoIndex];
+            videoPlayerContainer.innerHTML = `
+                <iframe 
+                    class="absolute w-full h-full"
+                    src="${video.url}" 
+                    title="${video.title}" 
+                    frameborder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowfullscreen>
+                </iframe>
+            `;
+            videoCounter.textContent = `${currentVideoIndex + 1} / ${videoContents.length}`;
+        }
+
+        function navigateVideo(direction) {
+            currentVideoIndex = (currentVideoIndex + direction + videoContents.length) % videoContents.length;
+            updateVideoPlayer();
+        }
+
+        if(prevVideoButton && nextVideoButton) {
+            prevVideoButton.addEventListener('click', () => navigateVideo(-1));
+            nextVideoButton.addEventListener('click', () => navigateVideo(1));
+        }
+
+
+        // -----------------------------------------------------------------
+        // 4. 3D 建模區塊 (Three.js) 邏輯
+        // -----------------------------------------------------------------
+        
+        // 3D 建模內容 (實際渲染只針對第一個)
+        const modelingContents = [
+            { id: "MODEL_1", name: "旋轉的藍色方塊", description: "Three.js 示範。拖曳滑鼠改變視角。" },
+            { id: "MODEL_2", name: "概念模型 A", description: "模型載入中... (此處為佔位符)" },
+            { id: "MODEL_3", name: "場景雕塑 B", description: "模型載入中... (此處為佔位符)" }
+        ];
+        let currentModelingIndex = 0;
+
+        const modelingTitle = document.getElementById('modeling-title');
+        const modelingDisplay = document.getElementById('modeling-display');
+        const modelingContainer = document.getElementById('modeling-container');
+
+        const modelingPrevButton = document.getElementById('modeling-prev');
+        const modelingNextButton = document.getElementById('modeling-next');
+
+        // Three.js 核心變數
+        let scene, camera, cube, directionalLight; 
+        
+        function updateModelingDisplay() {
+            const model = modelingContents[currentModelingIndex];
+            modelingTitle.textContent = `模型 ${currentModelingIndex + 1}/${modelingContents.length}: ${model.name} (${model.description})`;
+
+            // 清除現有內容
+            while (modelingContainer.firstChild) {
+                modelingContainer.removeChild(modelingContainer.lastChild);
+            }
+            if(threeJsRenderer) {
+                threeJsRenderer.dispose();
+                threeJsRenderer = null;
+            }
+
+            if (currentModelingIndex === 0) {
+                // 只有第一個模型渲染 Three.js
+                setupThreeJS();
+            } else {
+                // 其他模型顯示佔位符
+                modelingContainer.innerHTML = `
+                    <div class="w-full h-full flex items-center justify-center bg-gray-700">
+                        <p class="text-white text-2xl">
+                            ${model.name} 載入成功 (展示中為佔位符)
+                        </p>
+                    </div>
+                `;
+            }
+        }
+
+        function navigateModeling(direction) {
+            currentModelingIndex = (currentModelingIndex + direction + modelingContents.length) % modelingContents.length;
+            updateModelingDisplay();
+        }
+
+        // 綁定 3D 輪播事件
+        if(modelingPrevButton && modelingNextButton) {
+            modelingPrevButton.addEventListener('click', () => navigateModeling(-1));
+            modelingNextButton.addEventListener('click', () => navigateModeling(1));
+        }
+
+        // Three.js 核心函數 (僅在 currentModelingIndex === 0 時被呼叫)
+        function setupThreeJS() {
+            if (threeJsRenderer) return; // 避免重複初始化
+
+            // 1. 設置場景
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a1a); // 深灰色背景
+
+            // 2. 設置相機
+            camera = new THREE.PerspectiveCamera(75, modelingContainer.clientWidth / modelingContainer.clientHeight, 0.1, 1000);
+            camera.position.z = 5;
+
+            // 3. 設置渲染器
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(modelingContainer.clientWidth, modelingContainer.clientHeight);
+            modelingContainer.appendChild(renderer.domElement);
+            threeJsRenderer = renderer; // 儲存實例
+
+            // 4. 創建幾何體 (一個旋轉的藍色立方體)
+            const geometry = new THREE.BoxGeometry(2, 2, 2);
+            const material = new THREE.MeshPhongMaterial({ color: 0x00BFFF }); 
+            cube = new THREE.Mesh(geometry, material);
+            scene.add(cube);
+
+            // 5. 設置光源
+            const ambientLight = new THREE.AmbientLight(0x404040, 5); // 柔和的環境光
+            scene.add(ambientLight);
+            directionalLight = new THREE.DirectionalLight(0xffffff, 3);
+            directionalLight.position.set(5, 5, 5).normalize();
+            scene.add(directionalLight);
+
+            // 6. 互動控制 (滑鼠拖曳)
+            let isDragging = false;
+            let previousMousePosition = { x: 0, y: 0 };
+
+            function onMouseDown(event) {
+                if (currentModelingIndex !== 0) return;
+                isDragging = true;
+                previousMousePosition = { x: event.clientX, y: event.clientY };
+            }
+
+            function onMouseMove(event) {
+                if (!isDragging || currentModelingIndex !== 0) return;
+
+                const deltaX = event.clientX - previousMousePosition.x;
+                const deltaY = event.clientY - previousMousePosition.y;
+
+                cube.rotation.y += deltaX * 0.005;
+                cube.rotation.x += deltaY * 0.005;
+
+                previousMousePosition = { x: event.clientX, y: event.clientY };
+            }
+
+            function onMouseUp() {
+                isDragging = false;
+            }
+
+            modelingContainer.addEventListener('mousedown', onMouseDown);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+            
+            // 增加觸控事件支持 
+            function onTouchStart(event) {
+                if (currentModelingIndex !== 0 || event.touches.length !== 1) return;
+                isDragging = true;
+                previousMousePosition = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+            }
+
+            function onTouchMove(event) {
+                if (!isDragging || currentModelingIndex !== 0 || event.touches.length !== 1) return;
+                event.preventDefault();
+
+                const currentTouch = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+                const deltaX = currentTouch.x - previousMousePosition.x;
+                const deltaY = currentTouch.y - previousMousePosition.y;
+
+                cube.rotation.y += deltaX * 0.005;
+                cube.rotation.x += deltaY * 0.005;
+
+                previousMousePosition = currentTouch;
+            }
+
+            function onTouchEnd() {
+                isDragging = false;
+            }
+
+            modelingContainer.addEventListener('touchstart', onTouchStart);
+            modelingContainer.addEventListener('touchmove', onTouchMove);
+            modelingContainer.addEventListener('touchend', onTouchEnd);
+
+
+            // 7. 處理響應式 (Resize)
+            function onWindowResize() {
+                if (threeJsRenderer) {
+                    threeJsRenderer.setSize(modelingContainer.clientWidth, modelingContainer.clientHeight);
+                    camera.aspect = modelingContainer.clientWidth / modelingContainer.clientHeight;
+                    camera.updateProjectionMatrix();
+                }
+            }
+
+            window.addEventListener('resize', onWindowResize, false);
+
+
+            // 8. 動畫循環
+            function animate() {
+                if (threeJsRenderer) {
+                    requestAnimationFrame(animate);
+
+                    if (!isDragging && cube) {
+                       cube.rotation.y += 0.005;
+                       cube.rotation.x += 0.001;
+                    }
+                    
+                    threeJsRenderer.render(scene, camera);
+                }
+            }
+            animate();
+        }
+
+
+        // -----------------------------------------------------------------
+        // 5. 畫廊圖片輪播邏輯 (通用函數)
+        // -----------------------------------------------------------------
+        
+        /**
+         * 設置圖片輪播功能
+         * @param {string} displayId 圖片顯示容器的 ID
+         * @param {string} prevId 上一頁按鈕 ID
+         * @param {string} nextId 下一頁按鈕 ID
+         * @param {Array<string>} contentUrls 圖片 URL 陣列
+         * @param {string} counterId 計數器 ID (可選)
+         * @param {number} itemsPerGroup 每組顯示的圖片數量 (預設為 1)
+         * @param {string} itemClasses 圖片卡片的 CSS 類別
+         */
+        function setupImageCarousel(displayId, prevId, nextId, contentUrls, counterId, itemsPerGroup = 1, itemClasses = 'w-full') {
+            const display = document.getElementById(displayId);
+            const prevBtn = document.getElementById(prevId);
+            const nextBtn = document.getElementById(nextId);
+            const counter = counterId ? document.getElementById(counterId) : null;
+            
+            let currentIndex = 0;
+            const totalItems = contentUrls.length;
+            const totalGroups = Math.ceil(totalItems / itemsPerGroup);
+
+            const updateCarousel = () => {
+                // 清空顯示區
+                display.innerHTML = '';
+                
+                let start = currentIndex * itemsPerGroup;
+                let end = Math.min(start + itemsPerGroup, totalItems);
+                
+                for (let i = start; i < end; i++) {
+                    const imageUrl = contentUrls[i];
+                    
+                    const card = document.createElement('div');
+                    card.className = `gallery-card rounded-lg overflow-hidden cursor-pointer ${itemClasses}`;
+                    card.innerHTML = `
+                        <!-- 確保圖片使用 w-full 佔滿容器 -->
+                        <img src="${imageUrl}" alt="" class="w-full h-auto object-cover">
+                    `;
+                    display.appendChild(card);
+                }
+
+                if (counter) {
+                    counter.textContent = `${currentIndex + 1} / ${totalGroups}`;
+                }
+            };
+
+            const navigate = (direction) => {
+                let newIndex = currentIndex + direction;
+                if (newIndex < 0) {
+                    newIndex = totalGroups - 1; // 循環到最後一組
+                } else if (newIndex >= totalGroups) {
+                    newIndex = 0; // 循環到第一組
+                }
+                currentIndex = newIndex;
+                updateCarousel();
+            };
+
+            prevBtn.addEventListener('click', () => navigate(-1));
+            nextBtn.addEventListener('click', () => navigate(1));
+
+            // 初始化顯示
+            updateCarousel();
+
+            // 處理視窗大小改變時的 Busts 數量變化 (針對 itemsPerGroup > 1 的情況)
+            if (itemsPerGroup > 1) {
+                 window.addEventListener('resize', updateCarousel);
+            }
+        }
+        
+        // -----------------------------------------------------------------
+        // 5.1 人物立繪 輪播 (單一顯示)
+        // -----------------------------------------------------------------
+        const fullBodyUrls = [
+            "picture/summer21-1.png",
+            "picture/summer05.png",
+            "picture/summer25.png",
+            "picture/summer24.png",
+            "picture/summer01.png",
+            "picture/summer09.png",
+            "picture/summer17.png",
+            "picture/summer20.png",
+        ];
+        setupImageCarousel('full-body-display', 'full-body-prev', 'full-body-next', fullBodyUrls, null, 1, 'w-full');
+
+
+        // -----------------------------------------------------------------
+        // 5.2 人物半身圖 輪播 (分組顯示 - 3張)
+        // -----------------------------------------------------------------
+        const bustUrls = [
+            "picture/summer28-2.png",
+            "picture/summer23.png",
+            "picture/summer13.png",
+            "picture/summer02.png",
+            "picture/summer03.png",
+            "picture/summer10.png",
+            "picture/summer11.png",
+            "picture/summer12.png",
+            "picture/summer14.png",
+            "picture/summer18.png",
+            "picture/summer29.png",
+            "picture/summer32.png",
+
+        ];
+        // itemsPerGroup 設為 3 
+        setupImageCarousel('busts-display', 'busts-prev', 'busts-next', bustUrls, 'busts-counter', 3, 'w-full');
+
+        // -----------------------------------------------------------------
+        // 5.3 16:9 插圖 輪播 (單一顯示)
+        // -----------------------------------------------------------------
+        const illustrationUrls = [
+            "picture/summer04.png",
+            "picture/summer06.png",
+            "picture/summer07.png",
+            "picture/summer08.png",
+            "picture/summer16.png",
+        ];
+        setupImageCarousel('illustrations-display', 'illustrations-prev', 'illustrations-next', illustrationUrls, null, 1, 'w-full');
+        
+        // -----------------------------------------------------------------
+        // 5.4 場景圖 滾動式切換 (Scene Illustrations)
+        // -----------------------------------------------------------------
+        const sceneUrls = [
+            "https://placehold.co/1200x500/333/FFF?text=SCENE+01",
+            "https://placehold.co/1200x500/444/FFF?text=SCENE+02",
+            "https://placehold.co/1200x500/555/FFF?text=SCENE+03",
+            "https://placehold.co/1200x500/666/FFF?text=SCENE+04",
+            "https://placehold.co/1200x500/777/FFF?text=SCENE+05",
+            "https://placehold.co/1200x500/888/FFF?text=SCENE+06"
+        ];
+        
+        function setupSceneScrollCarousel() {
+            const display = document.getElementById('scenes-display');
+            display.innerHTML = ''; // 清空內容
+            const itemsPerGroup = 1; // <--- 從 2 改為 1，一次顯示一張
+
+            for (let i = 0; i < sceneUrls.length; i += itemsPerGroup) {
+                const group = document.createElement('div');
+                group.className = 'scene-group'; // CSS 樣式包含 scroll-snap-align: center
+
+                for (let j = 0; j < itemsPerGroup; j++) {
+                    const index = i + j;
+                    if (index < sceneUrls.length) {
+                        const imageUrl = sceneUrls[index];
+                        const card = document.createElement('div');
+                        // 使用 flex-shrink-0 確保圖片在 group 內不會被過度壓縮
+                        card.className = 'gallery-card rounded-lg overflow-hidden cursor-pointer flex-shrink-0'; 
+                        card.innerHTML = `
+                            <img src="${imageUrl}" alt="" class="w-full h-auto object-cover">
+                        `;
+                        group.appendChild(card);
+                    }
+                }
+                display.appendChild(group);
+            }
+        }
+        
+        // -----------------------------------------------------------------
+        // 頁面載入完成後的啟動
+        // -----------------------------------------------------------------
+        window.onload = function () {
+            // 1. 初始化 Firebase 和認證
+            initFirebaseAndAuth();
+
+            // 2. 設定平滑滾動
+            const navLinks = document.querySelectorAll('.nav-link, header a');
+            navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    if (link.hash !== "") {
+                        e.preventDefault();
+                        const hash = link.hash;
+                        const targetElement = document.querySelector(hash);
+
+                        // 導航到 #portfolio 時，定位到其頂部
+                        const offset = hash === '#portfolio' ? 70 : 70; 
+
+                        if (targetElement) {
+                            window.scrollTo({
+                                top: targetElement.offsetTop - offset, 
+                                behavior: 'smooth'
+                            });
+                        }
+                    }
+                });
+            });
+
+            // 3. 啟動 Hero 輪播
+            setInterval(rotateHeroContent, rotationInterval);
+
+            // 4. 初始化影片播放器
+            updateVideoPlayer();
+            
+            // 5. 啟動 3D 建模展示 (第一個模型)
+            updateModelingDisplay(); // 呼叫更新，它會進一步呼叫 setupThreeJS
+
+            // 6. 初始化場景圖滾動輪播
+            setupSceneScrollCarousel();
+        };
+
+        // 確保 resize 事件處理器能夠在 Three.js 存在時被觸發
+        window.addEventListener('resize', () => {
+            if (threeJsRenderer) {
+                // 重新設置尺寸和投影矩陣
+                threeJsRenderer.setSize(modelingContainer.clientWidth, modelingContainer.clientHeight);
+                camera.aspect = modelingContainer.clientWidth / modelingContainer.clientHeight;
+                camera.updateProjectionMatrix();
+            }
+        });
+    </script>
+</body>
+</html>
